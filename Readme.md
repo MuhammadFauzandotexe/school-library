@@ -8,8 +8,6 @@ Berikut adalah pratinjau halaman login utama aplikasi.
 
 ![img.png](img.png)
 
-(Catatan: Anda harus menempatkan gambar Anda, misalnya `image_d9be1b.jpg`, ke dalam folder di proyek Anda seperti `docs/` dan mengganti nama `login_page.png` di atas agar sesuai dengan path Anda.)
-
 ## Fitur Utama
 
 Sistem ini mencakup beberapa modul utama untuk manajemen perpustakaan yang lengkap.
