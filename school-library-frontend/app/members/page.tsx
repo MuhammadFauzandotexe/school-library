@@ -154,7 +154,7 @@ export default function MembersPage() {
             <Input
               placeholder="Cari nama, email, atau username..."
               value={search}
-              onChange={(e) => setSearch(e.g.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -196,9 +196,7 @@ export default function MembersPage() {
                       <tr key={member.id} className="border-b border-border hover:bg-muted">
                         <td className="py-3 px-4 font-medium">{member.memberId}</td>
                         <td className="py-3 px-4">{member.name}</td>
-                        {/* --- PERBAIKAN DI SINI --- */}
                         <td className="py-3 px-4">{member.username}</td>
-                        {/* --- AKHIR PERBAIKAN --- */}
                         <td className="py-3 px-4">{member.email}</td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">{member.joinDate}</td>
                         <td className="py-3 px-4">

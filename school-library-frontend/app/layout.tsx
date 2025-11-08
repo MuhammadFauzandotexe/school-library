@@ -11,7 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "School Library Management",
   description: "Modern school library management system",
-  generator: "v0.app",
+  // generator: "",
 }
 
 export default function RootLayout({

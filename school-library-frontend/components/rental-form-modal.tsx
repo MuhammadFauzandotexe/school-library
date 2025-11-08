@@ -77,10 +77,12 @@ export function RentalFormModal({ isOpen, onClose, onSubmit, books, members }: R
               required
             >
               <option value="">-- Pilih Buku --</option>
-              {books.map((book) => (
-                <option key={book.id} value={book.id}>
-                  {book.title}
-                </option>
+              {books
+                .filter(book => book.stock > 0) 
+                .map((book) => (
+                  <option key={book.id} value={book.id}>
+                    {book.title} ({book.stock} tersedia) 
+                  </option>
               ))}
             </select>
           </div>

@@ -6,200 +6,128 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LayoutWrapper } from "@/components/layout-wrapper"
-import { Plus, MoreHorizontal, Search, Loader2 } from "lucide-react"
+import { Plus, MoreHorizontal, Search } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RentalFormModal } from "@/components/rental-form-modal"
 import { ReturnRentalModal } from "@/components/return-rental-modal"
-import { toast } from "sonner" // Asumsi Anda menggunakan sonner/react-hot-toast untuk notifikasi
-
-// Definisikan base URL API Anda
-const API_BASE_URL = "http://localhost:8080/api"
+import { useAuth } from "@/lib/auth-context"
+import { api } from "@/lib/api"
 
 export default function RentalsPage() {
-  const [rents, setRents] = useState([])
-  const [books, setBooks] = useState([])
-  const [members, setMembers] = useState([])
-
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
+  const { role } = useAuth()
+  const [rents, setRents] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [books, setBooks] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false)
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
   const [selectedRental, setSelectedRental] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  // Fungsi untuk mengambil semua data peminjaman
-  const fetchRentals = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/rentals`) // Sesuaikan dengan URL controller Anda
-      if (!response.ok) throw new Error("Gagal mengambil data peminjaman")
-      const result = await response.json()
-      setRents(result.data || [])
-    } catch (err) {
-      setError(err.message)
-      toast.error(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Fungsi untuk mengambil data buku & anggota (untuk modal)
-  const fetchDependencies = async () => {
-    try {
-      const [booksRes, membersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/books`),
-        fetch(`${API_BASE_URL}/members`),
-      ])
-
-      if (!booksRes.ok) throw new Error("Gagal mengambil data buku")
-      if (!membersRes.ok) throw new Error("Gagal mengambil data anggota")
-
-      const booksResult = await booksRes.json()
-      const membersResult = await membersRes.json()
-
-      setBooks(booksResult.data || [])
-      setMembers(membersResult.data || [])
-    } catch (err) {
-      setError(err.message)
-      toast.error(err.message)
-    }
-  }
-
-  // Ambil semua data saat komponen dimuat
   useEffect(() => {
-    setLoading(true) // Set loading ke true di awal
-    Promise.all([
-      fetchRentals(),
-      fetchDependencies()
-    ]).catch((err) => {
-        // Handle error global jika diperlukan, meskipun fetch individu sudah punya
-        console.error("Gagal memuat data dependensi", err)
-    }).finally(() => {
-        // setLoading(false) // Dihapus dari sini karena fetchRentals sudah mengaturnya
-    });
+    const loadData = async () => {
+      try {
+        console.log(role);
+        setLoading(true)
+        const [rentalsData, membersData, booksData] = await Promise.all([
+          api.getRentals(),
+          api.getMembers(),
+          api.getBooks(),
+        ])
+        setRents(rentalsData)
+        setMembers(membersData)
+        setBooks(booksData)
+        setError("")
+      } catch (err) {
+        console.error("Failed to load data:", err)
+        setError("Gagal memuat data. Pastikan backend berjalan di http://localhost:8080")
+      } finally {
+        setLoading(false)
+      }
+      console.log(role)
+    }
+  
+    loadData()
   }, [])
 
-  // Handler untuk Tambah Peminjaman (CREATE)
-  const handleSubmitRental = async (formData) => {
-    // formData seharusnya berisi: { memberId: ID, bookId: ID }
-    try {
-      const response = await fetch(`${API_BASE_URL}/rentals/rent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData), // API Anda mengharapkan { memberId, bookId }
-      })
-
-      if (!response.ok) {
-        const errData = await response.json()
-        throw new Error(errData.message || "Gagal menambahkan peminjaman")
-      }
-
-      const newRental = await response.json()
-      // setRents([...rents, newRental.data]) // Sebaiknya fetch ulang untuk data konsisten
-      await fetchRentals() // Panggil fetchRentals untuk data terbaru
-      await fetchDependencies() // Panggil juga fetchDependencies untuk update stok buku
-      
-      setIsRentalModalOpen(false)
-      toast.success("Buku berhasil dipinjam")
-    } catch (err) {
-      toast.error(err.message)
-    }
-  }
-
-  // Handler untuk Konfirmasi Pengembalian (UPDATE)
-  const handleConfirmReturn = async (returnData) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/rentals/return/${returnData.rentId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-      })
-
-      if (!response.ok) {
-        const errData = await response.json()
-        throw new Error(errData.message || "Gagal mengembalikan buku")
-      }
-
-      const updatedRental = await response.json()
-
-      // Update data di state
-      setRents(rents.map((rent) =>
-        rent.rentId === updatedRental.data.rentId ? updatedRental.data : rent
-      ))
-      
-      await fetchDependencies() // Panggil juga fetchDependencies untuk update stok buku
-
-      setIsReturnModalOpen(false)
-      setSelectedRental(null)
-      toast.success("Buku berhasil dikembalikan")
-    } catch (err) {
-      toast.error(err.message)
-    }
-  }
-
-  // Handler untuk Hapus Peminjaman (DELETE)
-  const handleDeleteRental = async (rentId) => {
-    // Ganti window.confirm dengan modal kustom jika ada, atau biarkan untuk saat ini
-    if (!confirm("Apakah Anda yakin ingin menghapus data peminjaman ini?")) {
-      return
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/rentals/${rentId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        const errData = await response.json()
-        throw new Error(errData.message || "Gagal menghapus peminjaman")
-      }
-
-      // Hapus dari state
-      setRents(rents.filter((rent) => rent.rentId !== rentId))
-      toast.success("Data peminjaman berhasil dihapus")
-    } catch (err) {
-      toast.error(err.message)
-    }
-  }
-
-  // Fungsi utilitas untuk handler
   const handleAddRental = () => {
     setIsRentalModalOpen(true)
   }
 
-  const handleReturnRental = (rental) => {
+  const handleReturnRental = (rental: any) => {
+    console.log("rentallll")
+    console.log(rental)
     setSelectedRental(rental)
     setIsReturnModalOpen(true)
   }
 
-  // =================================================================
-  // PERBAIKAN DI SINI
-  // =================================================================
-  // Logika filter dibuat lebih aman
-  const filteredRents = rents.filter((rent) => {
-    const memberName = rent?.member?.name || "" // Memberi nilai default string kosong
-    const bookTitle = rent?.book?.title || "" // Memberi nilai default string kosong
+  const handleDeleteRental = async (rentId: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus data peminjaman ini?")) {
+      return
+    }
+    try {
+      await fetch(`http://localhost:8080/api/rentals/${rentId}`, {
+        method: "DELETE",
+      })
+      setRents(rents.filter((rent) => rent.id !== rentId))
+    } catch (err) {
+      console.error("Failed to delete rental:", err)
+      setError("Gagal menghapus peminjaman")
+    }
+  }
 
+  const handleSubmitRental = async (formData: any) => {
+    try {
+      const newRental = await api.createRental(formData.memberId, formData.bookId, formData.dueDate)
+      setRents([...rents, newRental])
+      setIsRentalModalOpen(false)
+    } catch (err) {
+      console.error("Failed to create rental:", err)
+      setError("Gagal membuat peminjaman")
+    }
+  }
+
+  const handleConfirmReturn = async (returnData: any) => {
+    console.log(returnData)
+    try {
+      const updated = await api.returnRental(returnData.rentId, returnData.returnDate)
+      setRents(rents.map((rent) => (rent.id === returnData.rentId ? updated : rent)))
+      setIsReturnModalOpen(false)
+      setSelectedRental(null)
+    } catch (err) {
+      console.error("Failed to return rental:", err)
+      setError("Gagal mengembalikan buku")
+    }
+  }
+
+  const filteredRents = rents.filter(
+    (rent) =>
+      rent.member.toLowerCase().includes(search.toLowerCase()) ||
+      rent.book.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  if (loading) {
     return (
-      memberName.toLowerCase().includes(search.toLowerCase()) ||
-      bookTitle.toLowerCase().includes(search.toLowerCase())
+      <LayoutWrapper breadcrumbs={["Manajemen Peminjaman"]}>
+        <div className="p-6 text-center">Loading...</div>
+      </LayoutWrapper>
     )
-  })
-  // =================================================================
-
-  if (error) {
-    return <LayoutWrapper><div className="p-6 text-red-500">Error: {error}</div></LayoutWrapper>
   }
 
   return (
     <LayoutWrapper breadcrumbs={["Manajemen Peminjaman"]}>
       <div className="p-6">
+        {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>}
         <Card className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Manajemen Peminjaman</h1>
-            <Button onClick={handleAddRental} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-              <Plus className="w-4 h-4" />
-              Tambah Peminjaman
-            </Button>
+            {role === "ADMIN" && (
+              <Button onClick={handleAddRental} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                <Plus className="w-4 h-4" />
+                Tambah Peminjaman
+              </Button>
+            )}
           </div>
 
           <div className="relative mb-6">
@@ -213,90 +141,79 @@ export default function RentalsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            {loading ? (
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                    <span className="ml-2">Memuat data...</span>
-                </div>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">ID</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Anggota</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Buku</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Tgl Pinjam</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Tgl Kembali</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Status</th>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">ID Peminjaman</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Anggota</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Buku</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Tanggal Pinjam</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Tanggal Kembali</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Status</th>
+                  {role === "ADMIN"&& (
                     <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRents.length > 0 ? (
-                    filteredRents.map((rent) => (
-                      <tr key={rent.rentId} className="border-b border-border hover:bg-muted">
-                        <td className="py-3 px-4 font-medium">#{rent.rentId}</td>
-                        {/* Tambahkan pengecekan keamanan di sini juga */}
-                        <td className="py-3 px-4">{rent?.member?.name || "Anggota Dihapus"}</td>
-                        <td className="py-3 px-4">{rent?.book?.title || "Buku Dihapus"}</td>
-                        <td className="py-3 px-4 text-sm">{rent.rentDate}</td>
-                        <td className="py-3 px-4 text-sm">{rent.returnDate || "-"}</td>
-                        <td className="py-3 px-4">
-                          <Badge
-                            variant={
-                              rent.status?.toLowerCase() === "returned" // Diperbarui
-                                ? "default"
-                                : rent.status?.toLowerCase() === "overdue" // Diperbarui
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {rent.status?.toLowerCase() === "returned"
-                              ? "Dikembalikan"
-                              : rent.status?.toLowerCase() === "overdue"
-                                ? "Terlambat"
-                                : "Dipinjam"}
-                          </Badge>
-                        </td>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRents.length > 0 ? (
+                  filteredRents.map((rent) => (
+                    <tr key={rent.id} className="border-b border-border hover:bg-muted">
+                      <td className="py-3 px-4 font-medium">#{rent.id}</td>
+                      <td className="py-3 px-4">{rent.member}</td>
+                      <td className="py-3 px-4">{rent.book}</td>
+                      <td className="py-3 px-4 text-sm">{rent.rentDate}</td>
+                      <td className="py-3 px-4 text-sm">{rent.returnDate || "-"}</td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          variant={
+                            rent.status === "RETURNED"
+                              ? "default"
+                              : rent.status === "OVERDUE"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                        >
+                          {rent.status === "RETURNED"
+                            ? "Dikembalikan"
+                            : rent.status === "OVERDUE"
+                              ? "Terlambat"
+                              : "Dipinjam"}
+                        </Badge>
+                      </td>
+                      {role === "ADMIN" && (
                         <td className="py-3 px-4">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button className="p-1 hover:bg-muted rounded">
-                                <MoreHorizontal className="w-4 h-4" />
+                                <MoreHorizontal className="w-4 h-4 text-foreground" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {rent.status?.toLowerCase() !== "returned" && (
+                              {rent.status !== "RETURNED" && (
                                 <DropdownMenuItem onClick={() => handleReturnRental(rent)}>
                                   Konfirmasi Kembali
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDeleteRental(rent.rentId)} // Diperbarui
-                              >
-                                Hapus
-                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="7" className="text-center py-10 text-muted-foreground">
-                        Tidak ada data peminjaman ditemukan.
-                      </td>
+                      )}
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={role === "ADMIN" ? 7 : 6} className="text-center py-10 text-muted-foreground">
+                      Tidak ada data peminjaman ditemukan.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </Card>
       </div>
 
-      {/* Modal ini sekarang mendapatkan data buku dan anggota dari API */}
       <RentalFormModal
         isOpen={isRentalModalOpen}
         onClose={() => setIsRentalModalOpen(false)}

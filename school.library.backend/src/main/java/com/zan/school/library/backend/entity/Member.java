@@ -29,11 +29,11 @@ public class Member {
 
     private LocalDate joinDate;
 
-    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "member", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<BookRent> rentals;
 
-    @OneToOne(mappedBy = "member", fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "member", fetch = FetchType.LAZY,cascade = CascadeType.REMOVE)
     @JsonIgnore
     private User user;
 

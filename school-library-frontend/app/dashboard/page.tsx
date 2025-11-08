@@ -1,10 +1,7 @@
 "use client"
-
-// 1. Impor hook React
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-// 2. Impor komponen UI
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"

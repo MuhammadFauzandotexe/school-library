@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -17,10 +16,30 @@ interface ReturnRentalModalProps {
 export function ReturnRentalModal({ isOpen, onClose, onSubmit, rentalData }: ReturnRentalModalProps) {
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split("T")[0])
 
+  useEffect(() => {
+    if (isOpen) {
+      setReturnDate(new Date().toISOString().split("T")[0])
+    }
+  }, [isOpen, rentalData])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({ ...rentalData, returnDate, status: "returned" })
-    setReturnDate(new Date().toISOString().split("T")[0])
+    if (!returnDate) {
+      alert("Mohon masukkan tanggal pengembalian")
+      return
+    }
+    
+    if (!rentalData || !rentalData.id) {
+        alert("Data peminjaman tidak ditemukan.")
+        return
+    }
+
+    onSubmit({ 
+      rentId: rentalData.id, 
+      returnDate: returnDate 
+    })
+    
+    onClose()
   }
 
   if (!isOpen) return null
@@ -32,19 +51,19 @@ export function ReturnRentalModal({ isOpen, onClose, onSubmit, rentalData }: Ret
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Buku</label>
-            <Input value={rentalData?.book || ""} disabled />
+            <Input value={rentalData?.book || ""} disabled className="bg-muted" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Anggota</label>
-            <Input value={rentalData?.member || ""} disabled />
+            <Input value={rentalData?.member || ""} disabled className="bg-muted" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Tanggal Peminjaman</label>
-            <Input value={rentalData?.rentDate || ""} disabled />
+            <Input value={rentalData?.rentDate || ""} disabled className="bg-muted" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Tanggal Pengembalian</label>
-            <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+            <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} required />
           </div>
           <div className="flex gap-3 pt-4">
             <Button variant="outline" onClick={onClose} className="flex-1 bg-transparent">
