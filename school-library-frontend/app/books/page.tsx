@@ -1,162 +1,160 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Book } from "@/types/book"
-import { BookFormModal } from "@/components/BookFormModal"
-import { BookTable } from "@/components/BookTable"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Loader2, Plus } from "lucide-react"
-import { LayoutWrapper } from "@/components/layout-wrapper" // Ini sudah benar
+import { Input } from "@/components/ui/input"
+import { LayoutWrapper } from "@/components/layout-wrapper"
+import { Plus, Search } from "lucide-react"
+import { BookFormModal } from "@/components/book-form-modal"
+import { BookTable } from "@/components/BookTable"
+import { useAuth } from "@/lib/auth-context"
+import { api } from "@/lib/api"
 
-const API_URL = "/api/books"
-
-export default function BookManagementPage() {
-  const [books, setBooks] = useState<Book[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
+export default function BooksPage() {
+  const { role } = useAuth()
+  const [books, setBooks] = useState<any[]>([])
+  const [search, setSearch] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"create" | "edit">("create")
-  const [currentBook, setCurrentBook] = useState<Book | null>(null)
-
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
-  const [isDeleting, setIsDeleting] = useState<number | null>(null)
-
-  async function fetchBooks() {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(API_URL)
-      if (!res.ok) {
-        throw new Error("Gagal mengambil data dari server")
-      }
-      const response = await res.json()
-      setBooks(response.data)
-    } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan saat memuat data")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const [selectedBook, setSelectedBook] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchBooks()
+    const loadBooks = async () => {
+      try {
+        setLoading(true)
+        const data = await api.getBooks()
+        setBooks(data)
+        setError("")
+      } catch (err) {
+        console.error("Failed to load books:", err)
+        setError("Gagal memuat data buku. Pastikan backend berjalan di http://localhost:8080")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadBooks()
   }, [])
 
-  const handleOpenCreate = () => {
+  const filteredBooks = books.filter(
+    (book) =>
+      book.title.toLowerCase().includes(search.toLowerCase()) ||
+      book.author.toLowerCase().includes(search.toLowerCase()) ||
+      book.isbn.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  const handleAddBook = () => {
     setModalMode("create")
-    setCurrentBook(null)
-    setSubmitError(null)
+    setSelectedBook(null)
     setModalOpen(true)
   }
 
-  const handleOpenEdit = (book: Book) => {
+  const handleEditBook = (book: any) => {
     setModalMode("edit")
-    setCurrentBook(book)
-    setSubmitError(null)
+    setSelectedBook(book)
     setModalOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Anda yakin ingin menghapus buku ini?")) {
+  const handleDeleteBook = async (bookId: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus buku ini?")) {
       return
     }
-
-    setIsDeleting(id)
-    setError(null)
     try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-      })
-
-      if (!res.ok) {
-        throw new Error("Gagal menghapus data")
-      }
-
-      setBooks((prevBooks) => prevBooks.filter((book) => book.id !== id))
-    } catch (err: any) {
-      setError(err.message || "Gagal menghapus buku.")
-    } finally {
-      setIsDeleting(null)
+      await api.deleteBook(bookId)
+      setBooks((prev) => prev.filter((b) => b.id !== bookId))
+    } catch (err) {
+      console.error("Failed to delete book:", err)
+      setError("Gagal menghapus buku")
     }
   }
 
-  const handleSubmit = async (formData: Book) => {
-    setIsSubmitting(true)
-    setSubmitError(null)
-
-    const isEdit = modalMode === "edit"
-    const url = isEdit ? `${API_URL}/${currentBook?.id}` : API_URL
-    const method = isEdit ? "PUT" : "POST"
-
+  const handleSubmitBook = async (formData: any) => {
     try {
-      const res = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.message || "Gagal menyimpan data")
+      if (modalMode === "create") {
+        const newBook = await api.createBook(
+          formData.isbn,
+          formData.title,
+          formData.author,
+          formData.publisher,
+          formData.publicationYear,
+          formData.stock,
+        )
+        setBooks((prev) => [...prev, newBook])
+      } else {
+        const updatedBook = await api.updateBook(
+          selectedBook.id,
+          formData.isbn,
+          formData.title,
+          formData.author,
+          formData.publisher,
+          formData.publicationYear,
+          formData.stock,
+        )
+        setBooks((prev) => prev.map((b) => (b.id === selectedBook.id ? updatedBook : b)))
       }
-
       setModalOpen(false)
-      fetchBooks()
-    } catch (err: any) {
-      setSubmitError(err.message || "Terjadi kesalahan. Silakan coba lagi.")
-    } finally {
-      setIsSubmitting(false)
+      setSelectedBook(null)
+    } catch (err) {
+      console.error("Failed to submit book:", err)
+      setError("Gagal menyimpan buku")
     }
+  }
+
+  if (loading) {
+    return (
+      <LayoutWrapper breadcrumbs={["Manajemen Buku"]}>
+        <div className="p-6 text-center">Loading...</div>
+      </LayoutWrapper>
+    )
   }
 
   return (
     <LayoutWrapper breadcrumbs={["Manajemen Buku"]}>
-      <div className="container mx-auto p-4 md:p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Manajemen Buku</h1>
-          <Button onClick={handleOpenCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Tambah Buku
-          </Button>
-        </div>
-
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="p-6">
+        {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>}
+        <Card className="p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-2xl font-bold">Manajemen Buku</h1>
+            {role === "ADMIN" && (
+              <Button
+                onClick={handleAddBook}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold py-2 px-4"
+              >
+                <Plus className="w-5 h-5" />
+                Tambah Buku Baru
+              </Button>
+            )}
           </div>
-        ) : (
-          <BookTable
-            books={books}
-            onEdit={handleOpenEdit}
-            onDelete={handleDelete}
-            isDeleting={isDeleting}
-          />
-        )}
 
-        <BookFormModal
-          open={modalOpen}
-          onOpenChange={setModalOpen}
-          onSubmit={handleSubmit}
-          initialData={currentBook}
-          mode={modalMode}
-          isSubmitting={isSubmitting}
-          error={submitError}
-        />
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari judul, penulis, atau ISBN..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 py-2"
+            />
+          </div>
+
+          <BookTable
+            books={filteredBooks}
+            onEdit={handleEditBook}
+            onDelete={handleDeleteBook}
+            showActions={role === "ADMIN"}
+          />
+        </Card>
       </div>
+
+      <BookFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onSubmit={handleSubmitBook}
+        initialData={selectedBook}
+        mode={modalMode}
+      />
     </LayoutWrapper>
   )
 }
