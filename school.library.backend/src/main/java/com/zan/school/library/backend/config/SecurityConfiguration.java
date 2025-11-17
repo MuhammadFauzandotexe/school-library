@@ -59,21 +59,16 @@ public class SecurityConfiguration {
                             "/index.html",
                             "/favicon.ico",
                             "/manifest.json",
-                            "/_next/**",       // <-- Paling Penting: Izinkan semua aset Next.js
-                            "/**/*.js",        // Izinkan JS di sub-folder
-                            "/**/*.css",       // Izinkan CSS di sub-folder
-                            "/**/*.png",       // Izinkan gambar
-                            "/**/*.svg",       // Izinkan gambar
-                            "/**/*.txt"        // <-- Izinkan file .txt (untuk ...__PAGE__.txt)
+                            "/_next/**",
+                            "/**/*.js",
+                            "/**/*.css",
+                            "/**/*.png",
+                            "/**/*.svg",
+                            "/**/*.txt"
                     ).permitAll();
 
-
-                    // allow credential
                     auth.requestMatchers("/api/v1/auth/login").permitAll();
                     auth.requestMatchers("/actuator/**").permitAll();
-
-                    // set role credential
-//                    auth.requestMatchers("/api/auth/register").hasAuthority("ADMIN");
                     auth.anyRequest().permitAll();
                 });
 
